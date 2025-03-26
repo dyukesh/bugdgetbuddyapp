@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   PieChart,
   Pie,
@@ -20,92 +20,123 @@ import { Label } from "@/components/ui/label";
 import { useTranslations } from "@/lib/hooks/use-translations";
 import { expenseCategories } from "@/lib/categories";
 import { type TranslationKey } from "@/lib/translations";
+import { useDatabase } from "@/lib/database-context";
+import { useCurrency } from "@/lib/currency-context";
+import { useLanguage } from "@/lib/language-context";
+import { formatCurrencyWithLocale } from "@/lib/utils/currency";
+import { startOfMonth, endOfMonth, subMonths } from "date-fns";
 
-// Mock data
-const mockCategoryData = [
-  { name: "Housing", value: 1200, id: "housing" },
-  { name: "Food & Dining", value: 450, id: "food" },
-  { name: "Transportation", value: 200, id: "transportation" },
-  { name: "Utilities", value: 150, id: "utilities" },
-  { name: "Entertainment", value: 100, id: "entertainment" },
-].map((item) => ({
-  ...item,
-  name: expenseCategories.find((cat) => cat.id === item.id)?.name || item.name,
-}));
+const COLORS = [
+  "#0088FE",
+  "#00C49F",
+  "#FFBB28",
+  "#FF8042",
+  "#8884d8",
+  "#82ca9d",
+  "#ffc658",
+  "#ff7300",
+];
 
 export function CategoryBreakdown() {
-  const { t } = useTranslations([
-    "reports.categoryBreakdown",
-    "time.currentMonth",
-    "time.previousMonth",
-    "time.thisYear",
-    ...expenseCategories.map((cat) => `categories.${cat.id}` as const),
-  ] as const satisfies readonly TranslationKey[]);
-  const [data] = useState(mockCategoryData);
-  const [timeframe, setTimeframe] = useState("current");
+  const { db } = useDatabase();
+  const { currency } = useCurrency();
+  const { language } = useLanguage();
+  const { t } = useTranslations(
+    expenseCategories.map((cat) => cat.translationKey as TranslationKey)
+  );
+  const [timeframe, setTimeframe] = useState("1");
+  const [data, setData] = useState<
+    Array<{
+      name: string;
+      value: number;
+      id: string;
+    }>
+  >([]);
 
-  const COLORS = [
-    "#0088FE",
-    "#00C49F",
-    "#FFBB28",
-    "#FF8042",
-    "#8884d8",
-    "#82ca9d",
-    "#ffc658",
-    "#8dd1e1",
-    "#a4de6c",
-    "#d0ed57",
-  ];
+  useEffect(() => {
+    const loadData = async () => {
+      const now = new Date();
+      const months = parseInt(timeframe, 10);
+      const start = startOfMonth(subMonths(now, months - 1));
+      const end = endOfMonth(now);
 
-  // Transform the data to use translated category names
-  const transformedData = data.map((item) => {
-    const category = expenseCategories.find((cat) => cat.id === item.id);
-    return {
-      ...item,
-      name: category
-        ? t(`categories.${category.id}` as TranslationKey)
-        : item.name,
+      const transactions = await db.transactions.toArray();
+
+      const categoryTotals = transactions
+        .filter((tx) => {
+          const txDate = new Date(tx.date);
+          return tx.type === "expense" && txDate >= start && txDate <= end;
+        })
+        .reduce((acc, tx) => {
+          acc[tx.category] = (acc[tx.category] || 0) + tx.amount;
+          return acc;
+        }, {} as Record<string, number>);
+
+      const categoryData = expenseCategories
+        .map((category) => ({
+          id: category.id,
+          name: t(category.translationKey as TranslationKey),
+          value: categoryTotals[category.id] || 0,
+        }))
+        .filter((item) => item.value > 0)
+        .sort((a, b) => b.value - a.value);
+
+      setData(categoryData);
     };
-  });
+
+    loadData();
+  }, [db, timeframe, t]);
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">
-          {t("reports.categoryBreakdown")}
-        </h2>
-        <Select value={timeframe} onValueChange={setTimeframe}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="current">{t("time.currentMonth")}</SelectItem>
-            <SelectItem value="previous">{t("time.previousMonth")}</SelectItem>
-            <SelectItem value="year">{t("time.thisYear")}</SelectItem>
-          </SelectContent>
-        </Select>
+      <div className="flex items-center gap-4">
+        <div className="grid w-full max-w-sm items-center gap-1.5">
+          <Label htmlFor="timeframe">Time Period</Label>
+          <Select value={timeframe} onValueChange={setTimeframe}>
+            <SelectTrigger id="timeframe">
+              <SelectValue placeholder="Select timeframe" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="1">Last Month</SelectItem>
+              <SelectItem value="3">Last 3 Months</SelectItem>
+              <SelectItem value="6">Last 6 Months</SelectItem>
+              <SelectItem value="12">Last Year</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
-      <div className="h-[300px]">
+      <div className="h-[400px]">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie
-              data={transformedData}
+              data={data}
+              dataKey="value"
+              nameKey="name"
               cx="50%"
               cy="50%"
-              labelLine={false}
-              outerRadius={80}
+              outerRadius={150}
               fill="#8884d8"
-              dataKey="value"
+              label={({ name, value }) =>
+                `${name}: ${formatCurrencyWithLocale(
+                  value,
+                  currency,
+                  language
+                )}`
+              }
             >
-              {transformedData.map((entry, index) => (
+              {data.map((_, index) => (
                 <Cell
                   key={`cell-${index}`}
                   fill={COLORS[index % COLORS.length]}
                 />
               ))}
             </Pie>
-            <Tooltip />
+            <Tooltip
+              formatter={(value) =>
+                formatCurrencyWithLocale(value as number, currency, language)
+              }
+            />
             <Legend />
           </PieChart>
         </ResponsiveContainer>

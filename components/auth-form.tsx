@@ -1,64 +1,75 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
-import { toast } from "sonner";
+import { useToast } from "@/components/ui/use-toast";
+import { Checkbox } from "@/components/ui/checkbox";
+import { PrivacyPolicyDialog } from "@/components/privacy-policy";
 import { useAuth } from "@/lib/auth";
-import { FcGoogle } from "react-icons/fc";
+import type { CheckedState } from "@radix-ui/react-checkbox";
 
-interface AuthFormProps {
-  type: "login" | "signup";
-}
-
-export function AuthForm({ type }: AuthFormProps) {
-  const router = useRouter();
-  const { signIn, signUp, signInWithGoogle } = useAuth();
-  const [loading, setLoading] = useState(false);
+export function AuthForm({ type = "login" }: { type?: "login" | "signup" }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [acceptedPrivacyPolicy, setAcceptedPrivacyPolicy] = useState(false);
+  const { signIn, signUp } = useAuth();
+  const { toast } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
+    if (loading) return;
 
+    setLoading(true);
     try {
-      if (type === "login") {
-        await signIn(email, password);
-        toast.success("Welcome back!");
-      } else {
+      if (type === "signup") {
+        if (!acceptedPrivacyPolicy) {
+          toast({
+            description: "Please accept the privacy policy",
+            variant: "destructive",
+          });
+          setLoading(false);
+          return;
+        }
         await signUp(email, password);
-        toast.success("Account created successfully!");
+      } else {
+        await signIn(email, password);
       }
-      router.push("/");
     } catch (error) {
-      console.error("Authentication error:", error);
-      toast.error(
-        error instanceof Error ? error.message : "Authentication failed"
-      );
+      toast({
+        description:
+          error instanceof Error ? error.message : "An error occurred",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
   };
 
+  const handleCheckboxChange = (checked: CheckedState) => {
+    setAcceptedPrivacyPolicy(checked === true);
+  };
+
   return (
     <Card className="w-full max-w-md">
-      <form onSubmit={handleSubmit}>
-        <CardContent className="space-y-4 pt-6">
+      <CardContent className="pt-6">
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
             <Input
               id="email"
               type="email"
-              placeholder="Enter your email"
+              placeholder="name@example.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
             />
           </div>
+
           <div className="space-y-2">
             <Label htmlFor="password">Password</Label>
             <Input
@@ -70,33 +81,35 @@ export function AuthForm({ type }: AuthFormProps) {
               required
             />
           </div>
-        </CardContent>
-        <CardFooter className="flex flex-col gap-4">
+
+          {type === "signup" && (
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="privacy"
+                checked={acceptedPrivacyPolicy}
+                onCheckedChange={handleCheckboxChange}
+              />
+              <Label htmlFor="privacy" className="text-sm">
+                I accept the <PrivacyPolicyDialog /> and understand this is a
+                student project
+              </Label>
+            </div>
+          )}
+
           <Button type="submit" className="w-full" disabled={loading}>
-            {type === "login" ? "Sign In" : "Sign Up"}
+            {loading ? "Loading..." : type === "login" ? "Sign In" : "Sign Up"}
           </Button>
-          <div className="relative w-full">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-background px-2 text-muted-foreground">
-                Or continue with
-              </span>
-            </div>
-          </div>
-          <Button
-            type="button"
-            variant="outline"
-            className="w-full"
-            onClick={() => signInWithGoogle()}
-            disabled={loading}
-          >
-            <FcGoogle className="mr-2 h-4 w-4" />
-            Google
-          </Button>
-        </CardFooter>
-      </form>
+        </form>
+      </CardContent>
+
+      <CardFooter className="flex justify-center">
+        <Link
+          href={type === "login" ? "/signup" : "/login"}
+          className="text-sm text-primary hover:underline"
+        >
+          {type === "login" ? "Create an account" : "Already have an account?"}
+        </Link>
+      </CardFooter>
     </Card>
   );
 }

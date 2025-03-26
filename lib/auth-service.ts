@@ -46,8 +46,6 @@ export const authService = {
       if (!user) {
         throw new Error("User not found");
       }
-
-      // In a real app, you'd hash the password and compare
       if (user.password !== password) {
         throw new Error("Invalid password");
       }

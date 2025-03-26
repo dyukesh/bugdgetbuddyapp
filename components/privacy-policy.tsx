@@ -7,83 +7,104 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 
-export function PrivacyPolicyDialog() {
-  return (
-    <Dialog>
-      <DialogTrigger asChild>
-        <Button variant="link" className="text-sm text-muted-foreground">
-          Privacy Policy
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Privacy Policy</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4 text-sm">
-          <p>Last updated: {new Date().toLocaleDateString()}</p>
+interface PrivacyPolicyDialogProps {
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  trigger?: boolean;
+}
 
+export function PrivacyPolicyDialog({
+  open,
+  onOpenChange,
+  trigger = true,
+}: PrivacyPolicyDialogProps) {
+  const content = (
+    <DialogContent className="max-w-3xl">
+      <DialogHeader>
+        <DialogTitle>Privacy Policy</DialogTitle>
+      </DialogHeader>
+      <ScrollArea className="h-[60vh] pr-4">
+        <div className="space-y-4">
           <section>
-            <h3 className="font-semibold mb-2">1. Introduction</h3>
+            <h2 className="text-lg font-semibold">1. Introduction</h2>
             <p>
-              Welcome to Budget Buddy. We respect your privacy and are committed
-              to protecting your personal data. This privacy policy explains how
-              we handle your information when you use our application.
+              Welcome to Budget Buddy! This web application is a college project
+              developed by students for educational purposes. We cannot
+              guarantee the security or reliability of the application. By using
+              Budget Buddy, you acknowledge and accept these risks.
             </p>
           </section>
 
           <section>
-            <h3 className="font-semibold mb-2">2. Data We Collect</h3>
-            <p>We collect and process the following data:</p>
-            <ul className="list-disc pl-6 mt-2">
-              <li>Account information (email, name)</li>
-              <li>Financial data (budgets, transactions, categories)</li>
-              <li>Usage data (how you interact with our application)</li>
+            <h2 className="text-lg font-semibold">2. Information We Collect</h2>
+            <ul className="list-disc pl-6">
+              <li>
+                Personal Information: name, email address, and account details
+              </li>
+              <li>Financial Information: income, expenses, and budget data</li>
+              <li>Usage Data: device type, browser type, and access times</li>
             </ul>
           </section>
 
           <section>
-            <h3 className="font-semibold mb-2">3. How We Use Your Data</h3>
-            <p>We use your data to:</p>
-            <ul className="list-disc pl-6 mt-2">
-              <li>Provide and maintain our services</li>
-              <li>Improve and personalize your experience</li>
-              <li>Send important updates and notifications</li>
-              <li>Analyze usage patterns to enhance our features</li>
-            </ul>
-          </section>
-
-          <section>
-            <h3 className="font-semibold mb-2">4. Data Storage</h3>
+            <h2 className="text-lg font-semibold">
+              3. Data Security Disclaimer
+            </h2>
             <p>
-              Your data is stored securely using IndexedDB in your browser. We
-              do not store your financial data on our servers. All sensitive
-              information remains on your device.
+              As this is a student project, Budget Buddy does not guarantee data
+              security. Users are advised not to enter sensitive financial
+              information. Use this app at your own risk.
             </p>
           </section>
 
           <section>
-            <h3 className="font-semibold mb-2">5. Your Rights</h3>
-            <p>You have the right to:</p>
-            <ul className="list-disc pl-6 mt-2">
-              <li>Access your personal data</li>
-              <li>Correct inaccurate data</li>
-              <li>Delete your data</li>
-              <li>Export your data</li>
-              <li>Restrict processing</li>
+            <h2 className="text-lg font-semibold">4. Your Rights</h2>
+            <ul className="list-disc pl-6">
+              <li>Access & Update your information through account settings</li>
+              <li>Delete your data upon request</li>
+              <li>Opt-out of communications</li>
             </ul>
           </section>
 
           <section>
-            <h3 className="font-semibold mb-2">6. Contact Us</h3>
+            <h2 className="text-lg font-semibold">5. Contact</h2>
             <p>
-              If you have any questions about this Privacy Policy, please
-              contact us at support@budgetbuddy.com
+              Questions about this Privacy Policy? Contact:
+              support@budgetbuddy.example.com
             </p>
           </section>
         </div>
-      </DialogContent>
+      </ScrollArea>
+    </DialogContent>
+  );
+
+  // If open and onOpenChange are provided, use controlled dialog
+  if (typeof open !== "undefined" && onOpenChange) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        {content}
+      </Dialog>
+    );
+  }
+
+  // Otherwise, use uncontrolled dialog with trigger
+  return (
+    <Dialog>
+      {trigger && (
+        <DialogTrigger asChild>
+          <Button
+            variant="link"
+            className="text-blue-500 hover:underline p-0 h-auto font-normal"
+            type="button"
+          >
+            Privacy Policy
+          </Button>
+        </DialogTrigger>
+      )}
+      {content}
     </Dialog>
   );
 }

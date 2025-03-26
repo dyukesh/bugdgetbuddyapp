@@ -1,27 +1,88 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { formatCurrency } from "@/lib/utils"
-
-// Mock data
-const mockMonthlyData = [
-  { month: "Jan 2023", income: 2500, expenses: 1800, savings: 700 },
-  { month: "Feb 2023", income: 2500, expenses: 1700, savings: 800 },
-  { month: "Mar 2023", income: 2700, expenses: 2000, savings: 700 },
-  { month: "Apr 2023", income: 2600, expenses: 1900, savings: 700 },
-  { month: "May 2023", income: 2800, expenses: 2100, savings: 700 },
-  { month: "Jun 2023", income: 3000, expenses: 2200, savings: 800 },
-]
+import { useState, useEffect } from "react";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from "recharts";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { useDatabase } from "@/lib/database-context";
+import { useCurrency } from "@/lib/currency-context";
+import { useLanguage } from "@/lib/language-context";
+import { formatCurrencyWithLocale } from "@/lib/utils/currency";
+import { startOfMonth, endOfMonth, subMonths, format } from "date-fns";
 
 export function IncomeVsExpense() {
-  const [data] = useState(mockMonthlyData)
+  const { db } = useDatabase();
+  const { currency } = useCurrency();
+  const { language } = useLanguage();
+  const [data, setData] = useState<
+    Array<{
+      month: string;
+      income: number;
+      expenses: number;
+      savings: number;
+    }>
+  >([]);
 
-  // Calculate totals
-  const totalIncome = data.reduce((sum, month) => sum + month.income, 0)
-  const totalExpenses = data.reduce((sum, month) => sum + month.expenses, 0)
-  const totalSavings = data.reduce((sum, month) => sum + month.savings, 0)
+  useEffect(() => {
+    const loadData = async () => {
+      const now = new Date();
+      const months = Array.from({ length: 6 }, (_, i) => {
+        const date = subMonths(now, 5 - i);
+        return {
+          start: startOfMonth(date),
+          end: endOfMonth(date),
+          label: format(date, "MMM yyyy"),
+        };
+      });
+
+      const transactions = await db.transactions.toArray();
+
+      const monthlyData = months.map(({ start, end, label }) => {
+        const monthTransactions = transactions.filter((tx) => {
+          const txDate = new Date(tx.date);
+          return txDate >= start && txDate <= end;
+        });
+
+        const income = monthTransactions
+          .filter((tx) => tx.type === "income")
+          .reduce((sum, tx) => sum + tx.amount, 0);
+
+        const expenses = monthTransactions
+          .filter((tx) => tx.type === "expense")
+          .reduce((sum, tx) => sum + tx.amount, 0);
+
+        return {
+          month: label,
+          income,
+          expenses,
+          savings: income - expenses,
+        };
+      });
+
+      setData(monthlyData);
+    };
+
+    loadData();
+  }, [db]);
+
+  // Calculate totals from actual data
+  const totalIncome = data.reduce((sum, month) => sum + month.income, 0);
+  const totalExpenses = data.reduce((sum, month) => sum + month.expenses, 0);
+  const totalSavings = data.reduce((sum, month) => sum + month.savings, 0);
 
   return (
     <div className="space-y-4">
@@ -31,16 +92,22 @@ export function IncomeVsExpense() {
             <CardTitle className="text-sm font-medium">Total Income</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(totalIncome)}</div>
+            <div className="text-2xl font-bold">
+              {formatCurrencyWithLocale(totalIncome, currency, language)}
+            </div>
             <p className="text-xs text-muted-foreground">Last 6 months</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Total Expenses</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Total Expenses
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(totalExpenses)}</div>
+            <div className="text-2xl font-bold">
+              {formatCurrencyWithLocale(totalExpenses, currency, language)}
+            </div>
             <p className="text-xs text-muted-foreground">Last 6 months</p>
           </CardContent>
         </Card>
@@ -49,7 +116,9 @@ export function IncomeVsExpense() {
             <CardTitle className="text-sm font-medium">Total Savings</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(totalSavings)}</div>
+            <div className="text-2xl font-bold">
+              {formatCurrencyWithLocale(totalSavings, currency, language)}
+            </div>
             <p className="text-xs text-muted-foreground">Last 6 months</p>
           </CardContent>
         </Card>
@@ -58,7 +127,9 @@ export function IncomeVsExpense() {
       <Card>
         <CardHeader>
           <CardTitle>Income vs. Expenses</CardTitle>
-          <CardDescription>Compare your income and expenses over time</CardDescription>
+          <CardDescription>
+            Compare your income and expenses over time
+          </CardDescription>
         </CardHeader>
         <CardContent className="h-[400px]">
           <ResponsiveContainer width="100%" height="100%">
@@ -74,7 +145,11 @@ export function IncomeVsExpense() {
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="month" />
               <YAxis />
-              <Tooltip formatter={(value) => [`$${value}`, ""]} />
+              <Tooltip
+                formatter={(value) =>
+                  formatCurrencyWithLocale(value as number, currency, language)
+                }
+              />
               <Legend />
               <Bar dataKey="income" name="Income" fill="#4ade80" />
               <Bar dataKey="expenses" name="Expenses" fill="#f87171" />
@@ -84,6 +159,5 @@ export function IncomeVsExpense() {
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }
-
